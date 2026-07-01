@@ -39,50 +39,78 @@ class Simulator {
                 ClearBackground(BLACK);
 
                 draw_grid();
-
+                draw_crosshair();
                 auto cursor = Point(GetMousePosition()).align_to_grid();
 
-                draw_crosshair();
+                DrawText(std::string(stringify_mode(m_mode)).c_str(), 0, 0, 50, WHITE);
 
-                auto diff = cursor - wire_start;
-                auto cursor_prime = diff.x > diff.y
-                    ? Point(cursor.x, wire_start.y)
-                    : Point(wire_start.x, cursor.y);
-
-                if (drawing_wire) {
-                    DrawLineV(wire_start, cursor_prime, WHITE);
+                if (IsKeyPressed(KEY_N)) {
+                    m_mode = Mode((m_mode + 1) % Mode::COUNT);
                 }
 
-                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-
-                    if (not drawing_wire) {
-                        drawing_wire = true;
-                        wire_start = cursor;
-
-                    } else {
-                        m_components.push_back(std::make_unique<Wire>(wire_start / GRID_CELL_SIZE, cursor_prime / GRID_CELL_SIZE));
-                        wire_start = cursor;
-                    }
-
+                if (IsKeyPressed(KEY_P)) {
+                    m_mode = Mode(std::max(m_mode - 1, 0));
                 }
 
-                if (IsKeyPressed(KEY_Q)) {
-                    drawing_wire = false;
-                }
+                switch (m_mode) {
+                    using enum Mode;
 
-                if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
-                    m_components.push_back(std::make_unique<VoltageSource>(cursor / GRID_CELL_SIZE));
-                }
+                    case COUNT: assert(false);
 
-                if (IsMouseButtonPressed(MOUSE_BUTTON_MIDDLE)) {
-                    m_components.push_back(std::make_unique<Resistor>(cursor / GRID_CELL_SIZE));
+                    case WIRE: {
+
+                        auto diff = cursor - wire_start;
+                        auto cursor_prime = diff.x > diff.y
+                            ? Point(cursor.x, wire_start.y)
+                            : Point(wire_start.x, cursor.y);
+
+                        if (drawing_wire) {
+                            DrawLineV(wire_start, cursor_prime, WHITE);
+                        }
+
+                        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+
+                            if (not drawing_wire) {
+                                drawing_wire = true;
+                                wire_start = cursor;
+
+                            } else {
+                                m_components.push_back(std::make_unique<Wire>(wire_start / GRID_CELL_SIZE, cursor_prime / GRID_CELL_SIZE));
+                                wire_start = cursor;
+                            }
+
+                        }
+
+                        if (IsKeyPressed(KEY_Q)) {
+                            drawing_wire = false;
+                        }
+
+                    } break;
+
+                    case DELETE: {
+
+                    } break;
+
+                    case RESISTOR: {
+
+                        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                            m_components.push_back(std::make_unique<Resistor>(cursor / GRID_CELL_SIZE));
+                        }
+
+                    } break;
+
+                    case VOLTAGE_SOURCE: {
+
+                        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                            m_components.push_back(std::make_unique<VoltageSource>(cursor / GRID_CELL_SIZE));
+                        }
+
+                    } break;
                 }
 
                 for (auto& component : m_components) {
                     component->draw();
                 }
-
-                simulate();
 
                 EndDrawing();
             }
@@ -92,7 +120,28 @@ class Simulator {
         }
 
     private:
+        enum Mode {
+            WIRE,
+            DELETE,
+            RESISTOR,
+            VOLTAGE_SOURCE,
+            COUNT,
+        };
+
+        Mode m_mode = Mode::WIRE;
         std::vector<std::unique_ptr<Component>> m_components;
+
+        [[nodiscard]] static std::string_view stringify_mode(Mode mode) {
+            switch (mode) {
+                using enum Mode;
+
+                case WIRE: return "wire";
+                case DELETE: return "delete";
+                case RESISTOR: return "resistor";
+                case VOLTAGE_SOURCE: return "voltage source";
+            }
+
+        }
 
         void simulate() const {
 

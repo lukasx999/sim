@@ -1,0 +1,8 @@
+{
+	"InstallScripts" : 
+	[
+		"/home/lukas/code/repos/sim/build/cmake_install.cmake",
+		"/home/lukas/code/repos/sim/build/src/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

@@ -1,0 +1,8 @@
+[
+{
+  "directory": "/home/lukas/code/repos/sim/build",
+  "command": "/usr/bin/c++ -std=gnu++23 -fdiagnostics-color=always -fsanitize=address,undefined -ggdb -Wall -Wextra -pedantic -o CMakeFiles/sim.dir/src/main.cpp.o -c /home/lukas/code/repos/sim/src/main.cpp",
+  "file": "/home/lukas/code/repos/sim/src/main.cpp",
+  "output": "/home/lukas/code/repos/sim/build/CMakeFiles/sim.dir/src/main.cpp.o"
+}
+]

@@ -1,5 +1,6 @@
 #include <print>
 #include <vector>
+#include <cassert>
 #include <cmath>
 #include <ranges>
 #include <memory>
@@ -8,144 +9,129 @@
 #include <raymath.h>
 
 #include "point.hpp"
+#include "components.hpp"
 
 #define DBG(stuff) std::println("{}: {}", #stuff, stuff);
 
-namespace {
+class Simulator {
+    public:
+        Simulator() = default;
 
-    class Component {
-        public:
-            Component() = default;
-            virtual ~Component() = default;
+        void run() {
 
-            virtual void draw() const = 0;
+            #if 1
+            auto v = std::make_unique<VoltageSource>(Point(2, 6));
+            auto r = std::make_unique<Resistor>(Point(8, 6));
+            m_components.push_back(std::make_unique<Wire>(v->terminal_pos(), r->terminal_pos()));
+            m_components.push_back(std::make_unique<Wire>(v->terminal_neg(), r->terminal_neg()));
+            m_components.push_back(std::move(v));
+            m_components.push_back(std::move(r));
+            #endif
 
-        protected:
-            static inline const Color m_color = WHITE;
+            SetTraceLogLevel(LOG_ERROR);
+            InitWindow(1600, 900, "sim");
 
-    };
+            bool drawing_wire = false;
+            Point wire_start;
 
-    class Wire : public Component {
-        public:
-            Wire(Point start, Point end)
-            : m_start(start)
-            , m_end(end)
-            { }
+            while (not WindowShouldClose()) {
+                BeginDrawing();
+                ClearBackground(BLACK);
 
-            void draw() const override {
-                DrawLineV(m_start, m_end, m_color);
+                draw_grid();
+
+                auto cursor = Point(GetMousePosition()).align_to_grid();
+
+                draw_crosshair();
+
+                auto diff = cursor - wire_start;
+                auto cursor_prime = diff.x > diff.y
+                    ? Point(cursor.x, wire_start.y)
+                    : Point(wire_start.x, cursor.y);
+
+                if (drawing_wire) {
+                    DrawLineV(wire_start, cursor_prime, WHITE);
+                }
+
+                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+
+                    if (not drawing_wire) {
+                        drawing_wire = true;
+                        wire_start = cursor;
+
+                    } else {
+                        m_components.push_back(std::make_unique<Wire>(wire_start / GRID_CELL_SIZE, cursor_prime / GRID_CELL_SIZE));
+                        wire_start = cursor;
+                    }
+
+                }
+
+                if (IsKeyPressed(KEY_Q)) {
+                    drawing_wire = false;
+                }
+
+                if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
+                    m_components.push_back(std::make_unique<VoltageSource>(cursor / GRID_CELL_SIZE));
+                }
+
+                if (IsMouseButtonPressed(MOUSE_BUTTON_MIDDLE)) {
+                    m_components.push_back(std::make_unique<Resistor>(cursor / GRID_CELL_SIZE));
+                }
+
+                for (auto& component : m_components) {
+                    component->draw();
+                }
+
+                simulate();
+
+                EndDrawing();
             }
 
-        private:
-            Point m_start;
-            Point m_end;
+            CloseWindow();
 
-            static inline const Color m_color = WHITE;
+        }
 
-    };
+    private:
+        std::vector<std::unique_ptr<Component>> m_components;
 
-    class VoltageSource : public Component {
-        public:
-            explicit VoltageSource(Point position)
-            : m_position(position)
-            { }
+        void simulate() const {
 
-            void draw() const override {
-                auto terminal = Point(0, m_terminal_distance * GRID_CELL_SIZE);
+            auto v0_it = std::ranges::find_if(m_components, [](const std::unique_ptr<Component>& component) {
+                return dynamic_cast<VoltageSource*>(component.get()) != nullptr;
+            });
+            assert(v0_it != m_components.end());
 
-                int radius = GRID_CELL_SIZE / 2;
-                DrawCircleLinesV(m_position, radius, m_color);
+            VoltageSource& v0 = *dynamic_cast<VoltageSource*>(v0_it->get());
+            auto pos = v0.terminal_pos();
 
-                DrawLineV(m_position, m_position + terminal, m_color);
-                DrawLineV(m_position, m_position - terminal, m_color);
+        }
 
-                DrawCircleV(m_position + terminal, 5, m_color);
-                DrawCircleV(m_position - terminal, 5, m_color);
+        void draw_crosshair() const {
+            auto cursor = Point(GetMousePosition()).align_to_grid();
+            DrawLine(cursor.x, 0, cursor.x, GetScreenHeight(), GRAY);
+            DrawLine(0, cursor.y, GetScreenWidth(), cursor.y, GRAY);
+        }
+
+        void draw_grid() const {
+
+            int width = GetScreenWidth();
+            int height = GetScreenHeight();
+
+            for (int x = 0; x < width; x += GRID_CELL_SIZE) {
+                DrawLine(x, 0, x, height, GRID_COLOR);
             }
 
-        private:
-            Point m_position;
+            for (int y = 0; y < height; y += GRID_CELL_SIZE) {
+                DrawLine(0, y, width, y, GRID_COLOR);
+            }
 
-            static const int m_terminal_distance = 1;
-
-    };
-
-    void draw_grid() {
-
-        int width = GetScreenWidth();
-        int height = GetScreenHeight();
-
-        for (int x = 0; x < width; x += GRID_CELL_SIZE) {
-            DrawLine(x, 0, x, height, GRID_COLOR);
         }
 
-        for (int y = 0; y < height; y += GRID_CELL_SIZE) {
-            DrawLine(0, y, width, y, GRID_COLOR);
-        }
-
-    }
-
-} // namespace
+};
 
 int main() {
 
-    std::vector<std::unique_ptr<Component>> components;
+    Simulator simulator;
+    simulator.run();
 
-    SetTraceLogLevel(LOG_ERROR);
-    InitWindow(1600, 900, "sim");
-
-    bool drawing_wire = false;
-    Point wire_start;
-
-    while (not WindowShouldClose()) {
-        BeginDrawing();
-        ClearBackground(BLACK);
-
-        draw_grid();
-
-        auto cursor = Point(GetMousePosition()).align_to_grid();
-
-        DrawLine(cursor.x, 0, cursor.x, GetScreenHeight(), WHITE);
-        DrawLine(0, cursor.y, GetScreenWidth(), cursor.y, WHITE);
-
-        // VoltageSource(cursor).draw();
-
-        auto diff = cursor - wire_start;
-        auto cursor_prime = diff.x > diff.y
-            ? Point(cursor.x, wire_start.y)
-            : Point(wire_start.x, cursor.y);
-
-        if (drawing_wire) {
-            DrawLineV(wire_start, cursor_prime, WHITE);
-        }
-
-        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-
-            if (not drawing_wire) {
-                drawing_wire = true;
-                wire_start = cursor;
-
-            } else {
-                components.push_back(std::make_unique<Wire>(wire_start, cursor_prime));
-                wire_start = cursor;
-            }
-
-        }
-
-        if (IsKeyPressed(KEY_Q)) {
-            drawing_wire = false;
-        }
-
-        if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
-            components.push_back(std::make_unique<VoltageSource>(cursor));
-        }
-
-        for (auto& component : components) {
-            component->draw();
-        }
-
-        EndDrawing();
-    }
-
-    CloseWindow();
 }

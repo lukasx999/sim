@@ -7,7 +7,7 @@
 
 // TODO: move this somewhere else
 inline const Color GRID_COLOR = DARKGRAY;
-inline const int GRID_CELL_SIZE = 70;
+inline const int GRID_CELL_SIZE = 50;
 
 struct Point {
     uint32_t x = 0;
@@ -30,6 +30,12 @@ struct Point {
             static_cast<uint32_t>(roundf(static_cast<float>(x) / GRID_CELL_SIZE) * GRID_CELL_SIZE),
             static_cast<uint32_t>(roundf(static_cast<float>(y) / GRID_CELL_SIZE) * GRID_CELL_SIZE),
         };
+    }
+
+    bool operator<=>(const Point& other) const = default;
+
+    Point operator*(uint32_t value) const {
+        return { x * value, y * value };
     }
 
     Point operator+(const Point& other) const {

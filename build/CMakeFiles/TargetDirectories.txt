@@ -1,5 +1,0 @@
-/home/lukas/code/repos/sim/build/CMakeFiles/sim.dir
-/home/lukas/code/repos/sim/build/CMakeFiles/edit_cache.dir
-/home/lukas/code/repos/sim/build/CMakeFiles/rebuild_cache.dir
-/home/lukas/code/repos/sim/build/src/CMakeFiles/edit_cache.dir
-/home/lukas/code/repos/sim/build/src/CMakeFiles/rebuild_cache.dir

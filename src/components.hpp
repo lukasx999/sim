@@ -1,6 +1,7 @@
 #pragma once
 
-#include <cmath>
+#include <string>
+#include <string_view>
 
 #include <raylib.h>
 
@@ -15,6 +16,10 @@ class Component {
         virtual ~Component() = default;
 
         virtual void draw() const = 0;
+
+        [[nodiscard]] virtual Point terminal_pos() const = 0;
+        [[nodiscard]] virtual Point terminal_neg() const = 0;
+        [[nodiscard]] virtual std::string_view label() const = 0;
 
     protected:
         static inline const Color m_color = WHITE;
@@ -32,6 +37,18 @@ class Wire : public Component {
             DrawLineV(m_start * GRID_CELL_SIZE, m_end * GRID_CELL_SIZE, m_color);
         }
 
+        [[nodiscard]] Point terminal_pos() const override {
+            return m_start;
+        }
+
+        [[nodiscard]] Point terminal_neg() const override {
+            return m_end;
+        }
+
+        [[nodiscard]] std::string_view label() const override {
+            return "";
+        }
+
     private:
         Point m_start;
         Point m_end;
@@ -42,20 +59,25 @@ class Wire : public Component {
 
 class VoltageSource : public Component {
     public:
-        explicit VoltageSource(Point position)
+        VoltageSource(Point position, std::string label)
         : m_position(position)
+        , m_label(std::move(label))
         { }
 
         [[nodiscard]] Point position() const {
             return m_position;
         }
 
-        [[nodiscard]] Point terminal_pos() const {
+        [[nodiscard]] Point terminal_pos() const override {
             return { m_position.x, m_position.y - m_terminal_distance };
         }
 
-        [[nodiscard]] Point terminal_neg() const {
+        [[nodiscard]] Point terminal_neg() const override {
             return { m_position.x, m_position.y + m_terminal_distance };
+        }
+
+        [[nodiscard]] std::string_view label() const override {
+            return m_label;
         }
 
         void draw() const override {
@@ -77,6 +99,7 @@ class VoltageSource : public Component {
     private:
         Point m_position;
         int m_voltage = 10;
+        const std::string m_label;
 
         static const int m_terminal_distance = 2; // distance from center
 
@@ -84,20 +107,25 @@ class VoltageSource : public Component {
 
 class Resistor : public Component {
     public:
-        explicit Resistor(Point position)
+        Resistor(Point position, std::string label)
         : m_position(position)
+        , m_label(std::move(label))
         { }
 
         [[nodiscard]] Point position() const {
             return m_position;
         }
 
-        [[nodiscard]] Point terminal_pos() const {
+        [[nodiscard]] Point terminal_pos() const override {
             return { m_position.x, m_position.y - m_terminal_distance };
         }
 
-        [[nodiscard]] Point terminal_neg() const {
+        [[nodiscard]] Point terminal_neg() const override {
             return { m_position.x, m_position.y + m_terminal_distance };
+        }
+
+        [[nodiscard]] std::string_view label() const override {
+            return m_label;
         }
 
         void draw() const override {
@@ -120,6 +148,7 @@ class Resistor : public Component {
     private:
         Point m_position;
         int m_resistance = 10'000;
+        const std::string m_label;
 
         static const int m_terminal_distance = 2; // distance from center
 

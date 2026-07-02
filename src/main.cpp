@@ -31,87 +31,9 @@ class Simulator {
             SetTraceLogLevel(LOG_ERROR);
             InitWindow(1600, 900, "sim");
 
-            bool drawing_wire = false;
-            Point wire_start;
-
             while (not WindowShouldClose()) {
                 BeginDrawing();
-                ClearBackground(BLACK);
-
-                draw_grid();
-                draw_crosshair();
-                auto cursor = Point(GetMousePosition()).align_to_grid();
-
-                DrawText(std::string(stringify_mode(m_mode)).c_str(), 0, 0, 50, WHITE);
-
-                if (IsKeyPressed(KEY_N)) {
-                    m_mode = Mode((m_mode + 1) % Mode::COUNT);
-                }
-
-                if (IsKeyPressed(KEY_P)) {
-                    m_mode = Mode(std::max(m_mode - 1, 0));
-                }
-
-                switch (m_mode) {
-                    using enum Mode;
-
-                    case COUNT: assert(false);
-
-                    case WIRE: {
-
-                        auto diff = cursor - wire_start;
-                        auto cursor_prime = diff.x > diff.y
-                            ? Point(cursor.x, wire_start.y)
-                            : Point(wire_start.x, cursor.y);
-
-                        if (drawing_wire) {
-                            DrawLineV(wire_start, cursor_prime, WHITE);
-                        }
-
-                        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-
-                            if (not drawing_wire) {
-                                drawing_wire = true;
-                                wire_start = cursor;
-
-                            } else {
-                                m_components.push_back(std::make_unique<Wire>(wire_start / GRID_CELL_SIZE, cursor_prime / GRID_CELL_SIZE));
-                                wire_start = cursor;
-                            }
-
-                        }
-
-                        if (IsKeyPressed(KEY_Q)) {
-                            drawing_wire = false;
-                        }
-
-                    } break;
-
-                    case DELETE: {
-
-                    } break;
-
-                    case RESISTOR: {
-
-                        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-                            m_components.push_back(std::make_unique<Resistor>(cursor / GRID_CELL_SIZE));
-                        }
-
-                    } break;
-
-                    case VOLTAGE_SOURCE: {
-
-                        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-                            m_components.push_back(std::make_unique<VoltageSource>(cursor / GRID_CELL_SIZE));
-                        }
-
-                    } break;
-                }
-
-                for (auto& component : m_components) {
-                    component->draw();
-                }
-
+                on_iter();
                 EndDrawing();
             }
 
@@ -120,25 +42,101 @@ class Simulator {
         }
 
     private:
-        enum Mode {
+        enum class Mode {
             WIRE,
-            DELETE,
             RESISTOR,
             VOLTAGE_SOURCE,
-            COUNT,
         };
 
         Mode m_mode = Mode::WIRE;
         std::vector<std::unique_ptr<Component>> m_components;
+
+        bool m_is_drawing_wire = false;
+        Point m_wire_start;
 
         [[nodiscard]] static std::string_view stringify_mode(Mode mode) {
             switch (mode) {
                 using enum Mode;
 
                 case WIRE: return "wire";
-                case DELETE: return "delete";
                 case RESISTOR: return "resistor";
                 case VOLTAGE_SOURCE: return "voltage source";
+            }
+
+            std::unreachable();
+        }
+
+        void on_iter() {
+
+            ClearBackground(BLACK);
+
+            draw_grid();
+            draw_crosshair();
+            auto cursor = Point(GetMousePosition()).align_to_grid();
+
+            DrawText(std::string(stringify_mode(m_mode)).c_str(), 0, 0, 50, WHITE);
+
+            if (IsKeyPressed(KEY_W))
+                m_mode = Mode::WIRE;
+
+            else if (IsKeyPressed(KEY_R))
+                m_mode = Mode::RESISTOR;
+
+            else if (IsKeyPressed(KEY_V))
+                m_mode = Mode::VOLTAGE_SOURCE;
+
+            switch (m_mode) {
+                using enum Mode;
+
+                case WIRE: {
+
+                    auto diff = cursor - m_wire_start;
+                    auto cursor_prime = diff.x > diff.y
+                        ? Point(cursor.x, m_wire_start.y)
+                        : Point(m_wire_start.x, cursor.y);
+
+                    if (m_is_drawing_wire) {
+                        DrawLineV(m_wire_start, cursor_prime, WHITE);
+                    }
+
+                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+
+                        if (not m_is_drawing_wire) {
+                            m_is_drawing_wire = true;
+                            m_wire_start = cursor;
+
+                        } else {
+                            m_components.push_back(std::make_unique<Wire>(m_wire_start / GRID_CELL_SIZE, cursor_prime / GRID_CELL_SIZE));
+                            m_wire_start = cursor;
+                        }
+
+                    }
+
+                    if (IsKeyPressed(KEY_Q)) {
+                        m_is_drawing_wire = false;
+                    }
+
+                } break;
+
+                case RESISTOR: {
+
+                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                        m_components.push_back(std::make_unique<Resistor>(cursor / GRID_CELL_SIZE));
+                    }
+
+                } break;
+
+                case VOLTAGE_SOURCE: {
+
+                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                        m_components.push_back(std::make_unique<VoltageSource>(cursor / GRID_CELL_SIZE));
+                    }
+
+                } break;
+            }
+
+            for (auto& component : m_components) {
+                component->draw();
             }
 
         }
@@ -165,12 +163,17 @@ class Simulator {
 
             int width = GetScreenWidth();
             int height = GetScreenHeight();
+            int text_size = 30;
 
             for (int x = 0; x < width; x += GRID_CELL_SIZE) {
+                auto label = std::format("{}", x / GRID_CELL_SIZE);
+                DrawText(label.c_str(), x, 0, text_size, GRID_COLOR);
                 DrawLine(x, 0, x, height, GRID_COLOR);
             }
 
             for (int y = 0; y < height; y += GRID_CELL_SIZE) {
+                auto label = std::format("{}", y / GRID_CELL_SIZE);
+                DrawText(label.c_str(), 0, y, text_size, GRID_COLOR);
                 DrawLine(0, y, width, y, GRID_COLOR);
             }
 

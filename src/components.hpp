@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stdexcept>
 #include <string>
 #include <string_view>
 
@@ -17,9 +18,22 @@ class Component {
 
         virtual void draw() const = 0;
 
+        // TODO: use a more generic terminals() -> list<Point> method to support bjts/opamps...
         [[nodiscard]] virtual Point terminal1() const = 0;
         [[nodiscard]] virtual Point terminal2() const = 0;
         [[nodiscard]] virtual std::string_view label() const = 0;
+
+        [[nodiscard]] Point opposite_terminal(Point point) const {
+            if (point == terminal1())
+                return terminal2();
+
+            if (point == terminal2())
+                return terminal1();
+
+            else
+                throw std::invalid_argument("cannot find opposite terminal, as the given terminal does not exist on this component");
+        }
+
 
     protected:
         static inline const Color m_color = WHITE;
@@ -112,6 +126,10 @@ class Resistor : public Component {
         , m_label(std::move(label))
         { }
 
+        [[nodiscard]] uint32_t resistance() const {
+            return m_resistance;
+        }
+
         [[nodiscard]] Point position() const {
             return m_position;
         }
@@ -149,7 +167,7 @@ class Resistor : public Component {
 
     private:
         Point m_position;
-        int m_resistance = 10'000;
+        uint32_t m_resistance = 10'000;
         const std::string m_label;
 
         static const int m_terminal_distance = 2; // distance from center

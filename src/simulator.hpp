@@ -118,7 +118,6 @@ class Simulator {
 
             bool need_split = intersecting_wire != m_components.end();
             if (need_split) {
-                std::println("split");
                 auto start = (*intersecting_wire)->terminal1();
                 auto end = (*intersecting_wire)->terminal2();
                 m_components.erase(intersecting_wire);
@@ -222,12 +221,6 @@ class Simulator {
             return false;
         }
 
-        struct Node {
-            std::vector<std::unique_ptr<Node>> m_children;
-            enum class Type { SERIES, PARALLEL } m_type;
-            Component* m_component = nullptr;
-        };
-
         [[nodiscard]] std::vector<Component*> get_components_at_point(Point point) const {
             return m_components
             | std::views::transform(&std::unique_ptr<Component>::get)
@@ -252,9 +245,7 @@ class Simulator {
                 auto children = get_components_at_point(node);
                 for (auto& child : children) {
 
-                    Point point = child->terminal1() == node
-                        ? child->terminal2()
-                        : child->terminal1();
+                    auto point = child->opposite_terminal(node);
 
                     if (visited.contains(point)) continue;
                     frontier.push(point);

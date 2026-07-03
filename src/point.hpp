@@ -8,7 +8,7 @@
 
 // TODO: move this somewhere else
 inline const Color GRID_COLOR = DARKGRAY;
-inline const int GRID_CELL_SIZE = 50;
+inline const int GRID_CELL_SIZE = 30;
 
 struct Point {
     uint32_t x = 0;

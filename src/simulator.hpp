@@ -60,11 +60,12 @@ class Simulator {
             #endif
 
             SetTraceLogLevel(LOG_ERROR);
-            InitWindow(1600, 900, "sim");
+            InitWindow(1920, 1080, "sim");
+            SetExitKey(0);
 
             while (not WindowShouldClose()) {
                 BeginDrawing();
-                on_iter();
+                if (on_iter()) break;
                 EndDrawing();
             }
 
@@ -99,12 +100,11 @@ class Simulator {
             std::unreachable();
         }
 
-        void on_iter() {
+        bool on_iter() {
 
             ClearBackground(BLACK);
 
             draw_grid();
-            draw_crosshair();
             auto cursor = Point(GetMousePosition()).align_to_grid();
 
             DrawText(std::string(stringify_mode(m_mode)).c_str(), 0, 0, 50, WHITE);
@@ -121,18 +121,17 @@ class Simulator {
             else if (IsKeyPressed(KEY_S))
                 simulate();
 
+            else if (IsKeyPressed(KEY_Q))
+                return true;
+
             switch (m_mode) {
                 using enum Mode;
 
                 case WIRE: {
-
-                    auto diff = cursor - m_wire_start;
-                    auto cursor_prime = diff.x > diff.y
-                        ? Point(cursor.x, m_wire_start.y)
-                        : Point(m_wire_start.x, cursor.y);
+                    draw_crosshair();
 
                     if (m_is_drawing_wire) {
-                        DrawLineV(m_wire_start, cursor_prime, WHITE);
+                        DrawLineV(m_wire_start, cursor, WHITE);
                     }
 
                     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
@@ -142,19 +141,21 @@ class Simulator {
                             m_wire_start = cursor;
 
                         } else {
-                            m_components.push_back(std::make_unique<Wire>(m_wire_start / GRID_CELL_SIZE, cursor_prime / GRID_CELL_SIZE));
+                            m_components.push_back(std::make_unique<Wire>(m_wire_start / GRID_CELL_SIZE, cursor / GRID_CELL_SIZE));
                             m_wire_start = cursor;
                         }
 
                     }
 
-                    if (IsKeyPressed(KEY_Q)) {
+                    if (IsKeyPressed(KEY_ESCAPE)) {
                         m_is_drawing_wire = false;
                     }
 
                 } break;
 
                 case RESISTOR: {
+
+                    Resistor(cursor / GRID_CELL_SIZE, "R").draw();
 
                     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
                         auto label = std::format("R{}", m_label_count++);
@@ -176,6 +177,7 @@ class Simulator {
                 component->draw();
             }
 
+            return false;
         }
 
         struct Node {
@@ -235,7 +237,7 @@ class Simulator {
 
             int width = GetScreenWidth();
             int height = GetScreenHeight();
-            int text_size = 30;
+            int text_size = 20;
 
             for (int x = 0; x < width; x += GRID_CELL_SIZE) {
                 auto label = std::format("{}", x / GRID_CELL_SIZE);

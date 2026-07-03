@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cmath>
+#include <unordered_map>
 #include <cstdint>
 
 #include <raylib.h>
@@ -48,6 +49,15 @@ struct Point {
 
     operator Vector2() const {
         return Vector2(x, y);
+    }
+
+};
+
+template <>
+struct std::hash<Point> {
+
+    size_t operator()(const Point& point) const {
+        return std::hash<uint32_t>()(point.x) + std::hash<uint32_t>()(point.y);
     }
 
 };

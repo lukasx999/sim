@@ -1,6 +1,9 @@
 #pragma once
 
 #include <print>
+#include <unordered_map>
+#include <unordered_set>
+#include <queue>
 #include <vector>
 #include <cassert>
 #include <ranges>
@@ -18,41 +21,42 @@ class Simulator {
 
         void run() {
 
-            #if 0
-            auto v = std::make_unique<VoltageSource>(Point(2, 6), "V0");
-            auto r = std::make_unique<Resistor>(Point(8, 6), "R1");
-            m_components.push_back(std::make_unique<Wire>(v->terminal_pos(), r->terminal_pos()));
-            m_components.push_back(std::make_unique<Wire>(r->terminal_neg(), v->terminal_neg()));
-            m_components.push_back(std::move(v));
-            m_components.push_back(std::move(r));
-            #endif
-
             // current divider parallel
-            #if 1
-            auto v = std::make_unique<VoltageSource>(Point(2, 6), "V0");
+            #if 0
             auto r1 = std::make_unique<Resistor>(Point(8, 6), "R1");
             auto r2 = std::make_unique<Resistor>(Point(11, 6), "R2");
-            m_components.push_back(std::make_unique<Wire>(v->terminal_pos(), r1->terminal_pos()));
-            m_components.push_back(std::make_unique<Wire>(r1->terminal_neg(), v->terminal_neg()));
             m_components.push_back(std::make_unique<Wire>(r1->terminal_pos(), r2->terminal_pos()));
             m_components.push_back(std::make_unique<Wire>(r2->terminal_neg(), r1->terminal_neg()));
-            m_components.push_back(std::move(v));
             m_components.push_back(std::move(r1));
             m_components.push_back(std::move(r2));
             #endif
 
             // voltage divider series
             #if 0
-            auto v = std::make_unique<VoltageSource>(Point(2, 6), "V0");
             auto r1 = std::make_unique<Resistor>(Point(8, 6), "R1");
             auto r2 = std::make_unique<Resistor>(Point(8, 13), "R2");
-            m_components.push_back(std::make_unique<Wire>(v->terminal_pos(), r1->terminal_pos()));
             m_components.push_back(std::make_unique<Wire>(r1->terminal_neg(), r2->terminal_pos()));
-            m_components.push_back(std::make_unique<Wire>(r2->terminal_neg(), Point(2, 15)));
-            m_components.push_back(std::make_unique<Wire>(Point(2, 15), v->terminal_neg()));
-            m_components.push_back(std::move(v));
             m_components.push_back(std::move(r1));
             m_components.push_back(std::move(r2));
+            #endif
+
+            #if 0
+            auto r1 = std::make_unique<Resistor>(Point(8, 6), "R1");
+            m_components.push_back(std::move(r1));
+            #endif
+
+            #if 0
+            auto r1 = std::make_unique<Resistor>(Point(8, 6), "R1");
+            auto r2 = std::make_unique<Resistor>(Point(6, 12), "R2");
+            auto r3 = std::make_unique<Resistor>(Point(10, 12), "R3");
+            m_components.push_back(std::make_unique<Wire>(r1->terminal_neg(), Point(8, 10)));
+            m_components.push_back(std::make_unique<Wire>(Point(8, 10), r2->terminal_pos()));
+            m_components.push_back(std::make_unique<Wire>(Point(8, 10), r3->terminal_pos()));
+            m_components.push_back(std::make_unique<Wire>(r2->terminal_neg(), Point(8, 14)));
+            m_components.push_back(std::make_unique<Wire>(r3->terminal_neg(), Point(8, 14)));
+            m_components.push_back(std::move(r1));
+            m_components.push_back(std::move(r2));
+            m_components.push_back(std::move(r3));
             #endif
 
             SetTraceLogLevel(LOG_ERROR);
@@ -80,6 +84,8 @@ class Simulator {
 
         bool m_is_drawing_wire = false;
         Point m_wire_start;
+
+        uint32_t m_label_count = 1;
 
         [[nodiscard]] static std::string_view stringify_mode(Mode mode) {
             switch (mode) {
@@ -111,6 +117,9 @@ class Simulator {
 
             else if (IsKeyPressed(KEY_V))
                 m_mode = Mode::VOLTAGE_SOURCE;
+
+            else if (IsKeyPressed(KEY_S))
+                simulate();
 
             switch (m_mode) {
                 using enum Mode;
@@ -148,7 +157,8 @@ class Simulator {
                 case RESISTOR: {
 
                     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-                        m_components.push_back(std::make_unique<Resistor>(cursor / GRID_CELL_SIZE, "R"));
+                        auto label = std::format("R{}", m_label_count++);
+                        m_components.push_back(std::make_unique<Resistor>(cursor / GRID_CELL_SIZE, std::move(label)));
                     }
 
                 } break;
@@ -166,8 +176,6 @@ class Simulator {
                 component->draw();
             }
 
-            simulate();
-
         }
 
         struct Node {
@@ -176,60 +184,44 @@ class Simulator {
             Component* m_component = nullptr;
         };
 
-        [[nodiscard]] std::unique_ptr<Node> get_subcircuit_parallel(const Component& component) const {
-            auto point = component.terminal_pos();
-
-            auto components = m_components
-                | std::views::transform(&std::unique_ptr<Component>::get)
-                | std::views::filter([&](Component* c) {
-                    return c->terminal_pos() == point and c != &component;
-                })
-                | std::ranges::to<std::vector<Component*>>();
-
-            assert(not components.empty());
-
-            if (components.size() == 1) {
-                return std::make_unique<Node>(std::vector<std::unique_ptr<Node>>{}, Node::Type::PARALLEL, components.at(0));
-            }
-
-            auto children = components
-                | std::views::transform([&](Component* c) {
-                    return get_subcircuit_series(*c);
-                })
-                | std::ranges::to<std::vector<std::unique_ptr<Node>>>();
-
-            return std::make_unique<Node>(std::move(children), Node::Type::PARALLEL, nullptr);
+        [[nodiscard]] std::vector<Component*> get_components_at_point(Point point) const {
+            return m_components
+            | std::views::transform(&std::unique_ptr<Component>::get)
+            | std::views::filter([&](Component* c) {
+                return c->terminal_pos() == point;
+            })
+            | std::ranges::to<std::vector<Component*>>();
         }
 
-        [[nodiscard]] std::unique_ptr<Node> get_subcircuit_series(const Component& component) const {
-            auto node = std::make_unique<Node>();
-            auto point = component.terminal_pos();
+        void traverse_circuit(Point root) const {
 
-            while (point != component.terminal_neg()) {
-                auto component_it = std::ranges::find_if(m_components, [&](const std::unique_ptr<Component>& c) {
-                    return c->terminal_pos() == point and c.get() != &component;
-                });
-                assert(component_it != m_components.end());
+            std::queue<Point> frontier;
+            std::unordered_set<Point> visited;
 
-                Component& comp = **component_it;
-                node->m_children.push_back(get_subcircuit_parallel(comp));
-                std::println("{}", comp.label());
+            frontier.push(root);
+            visited.insert(root);
 
-                point = comp.terminal_neg();
+            while (not frontier.empty()) {
+                auto node = frontier.front();
+                frontier.pop();
+
+                auto children = get_components_at_point(node);
+                for (auto& child : children) {
+                    auto p = child->terminal_neg();
+                    if (visited.contains(p)) continue;
+                    frontier.push(p);
+                    visited.insert(node);
+
+                    std::println("{}", child->label());
+                }
+
             }
 
-            return node;
         }
 
         void simulate() const {
 
-            auto v0 = std::ranges::find_if(m_components, [](const std::unique_ptr<Component>& component) {
-                return dynamic_cast<VoltageSource*>(component.get()) != nullptr;
-            });
-            assert(v0 != m_components.end());
-
-            // get_subcircuit_series(**v0);
-            get_subcircuit_parallel(**v0);
+            traverse_circuit(Point(8, 4));
 
         }
 

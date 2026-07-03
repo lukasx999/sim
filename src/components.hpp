@@ -143,6 +143,8 @@ class Resistor : public Component {
 
             DrawCircleV(scaled_term_pos, NODE_RADIUS, WHITE);
             DrawCircleV(scaled_term_neg, NODE_RADIUS, WHITE);
+
+            DrawText(m_label.c_str(), width + m_position.x * GRID_CELL_SIZE, m_position.y * GRID_CELL_SIZE, 30, WHITE);
         }
 
     private:

@@ -105,8 +105,6 @@ class Simulator {
             ClearBackground(BLACK);
 
             draw_grid();
-            auto cursor = Point(GetMousePosition()).align_to_grid();
-
             DrawText(std::string(stringify_mode(m_mode)).c_str(), 0, 0, 50, WHITE);
 
             if (IsKeyPressed(KEY_W))
@@ -124,6 +122,8 @@ class Simulator {
             else if (IsKeyPressed(KEY_Q))
                 return true;
 
+            auto cursor = Point(GetMousePosition()).align_to_grid() / GRID_CELL_SIZE;
+
             switch (m_mode) {
                 using enum Mode;
 
@@ -132,17 +132,40 @@ class Simulator {
                     // TODO: wire splitting at junction
 
                     if (m_is_drawing_wire) {
-                        DrawLineV(m_wire_start, cursor, WHITE);
+                        DrawLineV(m_wire_start * GRID_CELL_SIZE, cursor * GRID_CELL_SIZE, WHITE);
                     }
 
                     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
 
-                        if (not m_is_drawing_wire) {
-                            m_is_drawing_wire = true;
+                        if (m_is_drawing_wire) {
+
+                            auto intersecting_wire = std::ranges::find_if(m_components, [&] (const std::unique_ptr<Component>& component) {
+                                bool is_wire = dynamic_cast<Wire*>(component.get()) != nullptr;
+                                auto start = component->terminal1();
+                                auto end = component->terminal2();
+
+                                // no need to split at the direct start/end of the wire
+                                auto start_ = Vector2MoveTowards(start, end, 1);
+                                auto end_ = Vector2MoveTowards(end, start, 1);
+
+                                bool need_split = CheckCollisionPointLine(cursor, start_, end_, 1);
+                                return is_wire and need_split;
+                            });
+
+                            bool need_split = intersecting_wire != m_components.end();
+                            if (need_split) {
+                                auto start = (*intersecting_wire)->terminal1();
+                                auto end = (*intersecting_wire)->terminal2();
+                                m_components.erase(intersecting_wire);
+                                m_components.push_back(std::make_unique<Wire>(start, cursor));
+                                m_components.push_back(std::make_unique<Wire>(cursor, end));
+                            }
+
+                            m_components.push_back(std::make_unique<Wire>(m_wire_start, cursor));
                             m_wire_start = cursor;
 
                         } else {
-                            m_components.push_back(std::make_unique<Wire>(m_wire_start / GRID_CELL_SIZE, cursor / GRID_CELL_SIZE));
+                            m_is_drawing_wire = true;
                             m_wire_start = cursor;
                         }
 
@@ -156,11 +179,11 @@ class Simulator {
 
                 case RESISTOR: {
 
-                    Resistor(cursor / GRID_CELL_SIZE, "R").draw();
+                    Resistor(cursor, "R").draw();
 
                     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
                         auto label = std::format("R{}", m_label_count++);
-                        m_components.push_back(std::make_unique<Resistor>(cursor / GRID_CELL_SIZE, std::move(label)));
+                        m_components.push_back(std::make_unique<Resistor>(cursor, std::move(label)));
                     }
 
                 } break;
@@ -168,7 +191,7 @@ class Simulator {
                 case VOLTAGE_SOURCE: {
 
                     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-                        m_components.push_back(std::make_unique<VoltageSource>(cursor / GRID_CELL_SIZE, "V"));
+                        m_components.push_back(std::make_unique<VoltageSource>(cursor, "V"));
                     }
 
                 } break;

@@ -100,6 +100,47 @@ class Simulator {
             std::unreachable();
         }
 
+        void split_wire_if_needed(Point point) {
+
+            auto intersecting_wire = std::ranges::find_if(m_components, [&] (const std::unique_ptr<Component>& component) {
+                bool is_wire = dynamic_cast<Wire*>(component.get()) != nullptr;
+                if (not is_wire) return false;
+
+                auto start = component->terminal1();
+                auto end = component->terminal2();
+
+                // no need to split at the direct start/end of the wire
+                auto start_ = Vector2MoveTowards(start, end, 1);
+                auto end_ = Vector2MoveTowards(end, start, 1);
+
+                return CheckCollisionPointLine(point, start_, end_, 1);
+            });
+
+            bool need_split = intersecting_wire != m_components.end();
+            if (need_split) {
+                std::println("split");
+                auto start = (*intersecting_wire)->terminal1();
+                auto end = (*intersecting_wire)->terminal2();
+                m_components.erase(intersecting_wire);
+                m_components.push_back(std::make_unique<Wire>(start, point));
+                m_components.push_back(std::make_unique<Wire>(point, end));
+            }
+
+        }
+
+        void place_wire(Point point) {
+
+            // TODO: also split wire of terminals of other components are in the way (eg: connecting 3 parallel resistors)
+
+            // if the start/end of the wire is on the middle of another wire, split that wire into two,
+            // to create an intersection
+            split_wire_if_needed(point);
+            split_wire_if_needed(m_wire_start);
+
+            m_components.push_back(std::make_unique<Wire>(m_wire_start, point));
+            m_wire_start = point;
+        }
+
         bool on_iter() {
 
             ClearBackground(BLACK);
@@ -139,30 +180,7 @@ class Simulator {
 
                         if (m_is_drawing_wire) {
 
-                            auto intersecting_wire = std::ranges::find_if(m_components, [&] (const std::unique_ptr<Component>& component) {
-                                bool is_wire = dynamic_cast<Wire*>(component.get()) != nullptr;
-                                auto start = component->terminal1();
-                                auto end = component->terminal2();
-
-                                // no need to split at the direct start/end of the wire
-                                auto start_ = Vector2MoveTowards(start, end, 1);
-                                auto end_ = Vector2MoveTowards(end, start, 1);
-
-                                bool need_split = CheckCollisionPointLine(cursor, start_, end_, 1);
-                                return is_wire and need_split;
-                            });
-
-                            bool need_split = intersecting_wire != m_components.end();
-                            if (need_split) {
-                                auto start = (*intersecting_wire)->terminal1();
-                                auto end = (*intersecting_wire)->terminal2();
-                                m_components.erase(intersecting_wire);
-                                m_components.push_back(std::make_unique<Wire>(start, cursor));
-                                m_components.push_back(std::make_unique<Wire>(cursor, end));
-                            }
-
-                            m_components.push_back(std::make_unique<Wire>(m_wire_start, cursor));
-                            m_wire_start = cursor;
+                            place_wire(cursor);
 
                         } else {
                             m_is_drawing_wire = true;

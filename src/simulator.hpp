@@ -129,6 +129,7 @@ class Simulator {
 
                 case WIRE: {
                     draw_crosshair();
+                    // TODO: wire splitting at junction
 
                     if (m_is_drawing_wire) {
                         DrawLineV(m_wire_start, cursor, WHITE);
@@ -190,7 +191,7 @@ class Simulator {
             return m_components
             | std::views::transform(&std::unique_ptr<Component>::get)
             | std::views::filter([&](Component* c) {
-                return c->terminal_pos() == point;
+                return c->terminal1() == point or c->terminal2() == point;
             })
             | std::ranges::to<std::vector<Component*>>();
         }
@@ -209,9 +210,13 @@ class Simulator {
 
                 auto children = get_components_at_point(node);
                 for (auto& child : children) {
-                    auto p = child->terminal_neg();
-                    if (visited.contains(p)) continue;
-                    frontier.push(p);
+
+                    Point point = child->terminal1() == node
+                        ? child->terminal2()
+                        : child->terminal1();
+
+                    if (visited.contains(point)) continue;
+                    frontier.push(point);
                     visited.insert(node);
 
                     std::println("{}", child->label());

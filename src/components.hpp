@@ -17,8 +17,8 @@ class Component {
 
         virtual void draw() const = 0;
 
-        [[nodiscard]] virtual Point terminal_pos() const = 0;
-        [[nodiscard]] virtual Point terminal_neg() const = 0;
+        [[nodiscard]] virtual Point terminal1() const = 0;
+        [[nodiscard]] virtual Point terminal2() const = 0;
         [[nodiscard]] virtual std::string_view label() const = 0;
 
     protected:
@@ -37,11 +37,11 @@ class Wire : public Component {
             DrawLineV(m_start * GRID_CELL_SIZE, m_end * GRID_CELL_SIZE, m_color);
         }
 
-        [[nodiscard]] Point terminal_pos() const override {
+        [[nodiscard]] Point terminal1() const override {
             return m_start;
         }
 
-        [[nodiscard]] Point terminal_neg() const override {
+        [[nodiscard]] Point terminal2() const override {
             return m_end;
         }
 
@@ -68,11 +68,11 @@ class VoltageSource : public Component {
             return m_position;
         }
 
-        [[nodiscard]] Point terminal_pos() const override {
+        [[nodiscard]] Point terminal1() const override {
             return { m_position.x, m_position.y - m_terminal_distance };
         }
 
-        [[nodiscard]] Point terminal_neg() const override {
+        [[nodiscard]] Point terminal2() const override {
             return { m_position.x, m_position.y + m_terminal_distance };
         }
 
@@ -84,8 +84,8 @@ class VoltageSource : public Component {
 
             int radius = m_terminal_distance * GRID_CELL_SIZE / 2;
             auto scaled_pos = m_position * GRID_CELL_SIZE;
-            auto scaled_term_pos = terminal_pos() * GRID_CELL_SIZE;
-            auto scaled_term_neg = terminal_neg() * GRID_CELL_SIZE;
+            auto scaled_term_pos = terminal1() * GRID_CELL_SIZE;
+            auto scaled_term_neg = terminal2() * GRID_CELL_SIZE;
 
             DrawCircleLinesV(scaled_pos, radius, m_color);
 
@@ -116,11 +116,11 @@ class Resistor : public Component {
             return m_position;
         }
 
-        [[nodiscard]] Point terminal_pos() const override {
+        [[nodiscard]] Point terminal1() const override {
             return { m_position.x, m_position.y - m_terminal_distance };
         }
 
-        [[nodiscard]] Point terminal_neg() const override {
+        [[nodiscard]] Point terminal2() const override {
             return { m_position.x, m_position.y + m_terminal_distance };
         }
 
@@ -131,8 +131,8 @@ class Resistor : public Component {
         void draw() const override {
 
             auto scaled_pos = m_position * GRID_CELL_SIZE;
-            auto scaled_term_pos = terminal_pos() * GRID_CELL_SIZE;
-            auto scaled_term_neg = terminal_neg() * GRID_CELL_SIZE;
+            auto scaled_term_pos = terminal1() * GRID_CELL_SIZE;
+            auto scaled_term_neg = terminal2() * GRID_CELL_SIZE;
 
             int y = scaled_pos.y - m_terminal_distance * GRID_CELL_SIZE / 2;
             int width = m_terminal_distance * GRID_CELL_SIZE / 2;

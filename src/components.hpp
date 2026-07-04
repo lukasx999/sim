@@ -18,10 +18,11 @@ class Component {
 
         virtual void draw() const = 0;
 
+        [[nodiscard]] virtual std::string_view label() const = 0;
+
         // TODO: use a more generic terminals() -> list<Point> method to support bjts/opamps...
         [[nodiscard]] virtual Point terminal1() const = 0;
         [[nodiscard]] virtual Point terminal2() const = 0;
-        [[nodiscard]] virtual std::string_view label() const = 0;
 
         [[nodiscard]] Point opposite_terminal(Point point) const {
             if (point == terminal1())

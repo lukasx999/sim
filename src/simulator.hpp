@@ -1,7 +1,6 @@
 #pragma once
 
 #include <print>
-#include <unordered_map>
 #include <unordered_set>
 #include <queue>
 #include <vector>
@@ -20,44 +19,6 @@ class Simulator {
         Simulator() = default;
 
         void run() {
-
-            // current divider parallel
-            #if 0
-            auto r1 = std::make_unique<Resistor>(Point(8, 6), "R1");
-            auto r2 = std::make_unique<Resistor>(Point(11, 6), "R2");
-            m_components.push_back(std::make_unique<Wire>(r1->terminal_pos(), r2->terminal_pos()));
-            m_components.push_back(std::make_unique<Wire>(r2->terminal_neg(), r1->terminal_neg()));
-            m_components.push_back(std::move(r1));
-            m_components.push_back(std::move(r2));
-            #endif
-
-            // voltage divider series
-            #if 0
-            auto r1 = std::make_unique<Resistor>(Point(8, 6), "R1");
-            auto r2 = std::make_unique<Resistor>(Point(8, 13), "R2");
-            m_components.push_back(std::make_unique<Wire>(r1->terminal_neg(), r2->terminal_pos()));
-            m_components.push_back(std::move(r1));
-            m_components.push_back(std::move(r2));
-            #endif
-
-            #if 0
-            auto r1 = std::make_unique<Resistor>(Point(8, 6), "R1");
-            m_components.push_back(std::move(r1));
-            #endif
-
-            #if 0
-            auto r1 = std::make_unique<Resistor>(Point(8, 6), "R1");
-            auto r2 = std::make_unique<Resistor>(Point(6, 12), "R2");
-            auto r3 = std::make_unique<Resistor>(Point(10, 12), "R3");
-            m_components.push_back(std::make_unique<Wire>(r1->terminal_neg(), Point(8, 10)));
-            m_components.push_back(std::make_unique<Wire>(Point(8, 10), r2->terminal_pos()));
-            m_components.push_back(std::make_unique<Wire>(Point(8, 10), r3->terminal_pos()));
-            m_components.push_back(std::make_unique<Wire>(r2->terminal_neg(), Point(8, 14)));
-            m_components.push_back(std::make_unique<Wire>(r3->terminal_neg(), Point(8, 14)));
-            m_components.push_back(std::move(r1));
-            m_components.push_back(std::move(r2));
-            m_components.push_back(std::move(r3));
-            #endif
 
             SetTraceLogLevel(LOG_ERROR);
             InitWindow(1920, 1080, "sim");
@@ -178,7 +139,6 @@ class Simulator {
                     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
 
                         if (m_is_drawing_wire) {
-
                             place_wire(cursor);
 
                         } else {
@@ -221,7 +181,7 @@ class Simulator {
             return false;
         }
 
-        [[nodiscard]] std::vector<Component*> get_components_at_point(Point point) const {
+        [[nodiscard]] std::vector<Component*> components_at_point(Point point) const {
             return m_components
             | std::views::transform(&std::unique_ptr<Component>::get)
             | std::views::filter([&](Component* c) {
@@ -242,14 +202,14 @@ class Simulator {
                 auto node = frontier.front();
                 frontier.pop();
 
-                auto children = get_components_at_point(node);
+                auto children = components_at_point(node);
                 for (auto& child : children) {
 
                     auto point = child->opposite_terminal(node);
 
                     if (visited.contains(point)) continue;
                     frontier.push(point);
-                    visited.insert(node);
+                    visited.insert(point);
 
                     std::println("{}", child->label());
                 }

@@ -192,21 +192,21 @@ class Simulator {
             | std::ranges::to<std::vector<Component*>>();
         }
 
-        /// @return a list of components at the given point, paired with their respective path from the root point to
-        /// the root point of the actual component. this is necessary, because since this function ignores wires, the
-        /// given root parameter might not be the root of the returned component. the intermediate path is required so that
-        /// in traversal all of the intermediate points may be marked as visited.
-        [[nodiscard]] std::vector<std::pair<Component*, std::vector<Point>>> components_at_point_no_wires(Point root) const {
+        /// @return a list of components at the given point, aswell as all of the intermediate points that have been visited.
+        /// this is because this function ignores wires, and therefore the given root parameter might not be the same root as
+        /// the local root of the component.
+        [[nodiscard]] auto components_at_point_no_wires(Point root) const
+        -> std::pair<std::vector<std::pair<Component*, Point>>, std::vector<Point>>
+        {
 
-            std::vector<std::pair<Component*, std::vector<Point>>> result;
+            std::vector<std::pair<Component*, Point>> components;
+            std::vector<Point> visited_nodes;
+
             std::queue<Point> frontier;
             std::unordered_set<Point> visited;
 
             frontier.push(root);
             visited.insert(root);
-
-            // TODO: doesnt this conflict with other components?
-            std::vector<Point> intermediate_path;
 
             while (not frontier.empty()) {
                 auto node = frontier.front();
@@ -223,19 +223,17 @@ class Simulator {
 
                         frontier.push(point);
                         visited.insert(point);
-                        intermediate_path.push_back(point);
+                        visited_nodes.push_back(point);
 
                     } else {
-                        intermediate_path.push_back(node);
-                        result.push_back({child, intermediate_path});
-                        intermediate_path.clear();
+                        components.push_back({child, node});
                     }
 
                 }
 
             }
 
-            return result;
+            return {components, visited_nodes};
         }
 
         void traverse_circuit(Point root) const {
@@ -250,18 +248,18 @@ class Simulator {
                 auto node = frontier.front();
                 frontier.pop();
 
-                auto children = components_at_point_no_wires(node);
+                auto [children, intermediate_path] = components_at_point_no_wires(node);
+                for (auto& p : intermediate_path) {
+                    visited.insert(p);
+                }
 
-                for (auto& [child, child_path] : children) {
-                    auto point = child->opposite_terminal(child_path.back());
+                for (auto& [child, child_root] : children) {
+                    assert(dynamic_cast<Wire*>(child) == nullptr);
+                    auto point = child->opposite_terminal(child_root);
 
                     if (visited.contains(point)) continue;
                     frontier.push(point);
                     visited.insert(point);
-
-                    for (auto& p : child_path | std::views::take(child_path.size() - 1)) {
-                        visited.insert(p);
-                    }
 
                     std::print("{}, ", child->label());
                 }
@@ -273,6 +271,16 @@ class Simulator {
 
         void simulate() const {
             Point root(10, 10);
+
+            // auto [children, path] = components_at_point_no_wires(root);
+            // for (auto& p : path) {
+            //     std::print("{} {}, ", p.x, p.y);
+            // }
+            // std::println();
+
+            // for (auto& [child, child_root] : children) {
+            //     std::println("{} ({} {})", child->label(), child_root.x, child_root.y);
+            // }
 
             traverse_circuit(root);
         }

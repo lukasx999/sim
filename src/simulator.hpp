@@ -192,13 +192,12 @@ class Simulator {
             | std::ranges::to<std::vector<Component*>>();
         }
 
-        /// @return a list of components at the given point, aswell as all of the intermediate points that have been visited.
-        /// this is because this function ignores wires, and therefore the given root parameter might not be the same root as
-        /// the local root of the component.
+        /// @returns a list of components at the given point, paired with their local root point,
+        /// aswell as all of the intermediate points that have been visited. this is because this function ignores wires,
+        /// and therefore the given root parameter might not be the same root as the local root of the component.
         [[nodiscard]] auto components_at_point_no_wires(Point root) const
         -> std::pair<std::vector<std::pair<Component*, Point>>, std::vector<Point>>
         {
-
             std::vector<std::pair<Component*, Point>> components;
             std::vector<Point> visited_nodes;
 
@@ -271,16 +270,6 @@ class Simulator {
 
         void simulate() const {
             Point root(10, 10);
-
-            // auto [children, path] = components_at_point_no_wires(root);
-            // for (auto& p : path) {
-            //     std::print("{} {}, ", p.x, p.y);
-            // }
-            // std::println();
-
-            // for (auto& [child, child_root] : children) {
-            //     std::println("{} ({} {})", child->label(), child_root.x, child_root.y);
-            // }
 
             traverse_circuit(root);
         }

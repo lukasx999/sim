@@ -61,7 +61,7 @@ class Wire : public Component {
         }
 
         [[nodiscard]] std::string_view label() const override {
-            return "";
+            return "wire";
         }
 
     private:

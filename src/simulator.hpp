@@ -184,10 +184,45 @@ class Simulator {
         [[nodiscard]] std::vector<Component*> components_at_point(Point point) const {
             return m_components
             | std::views::transform(&std::unique_ptr<Component>::get)
-            | std::views::filter([&](Component* c) {
-                return c->terminal1() == point or c->terminal2() == point;
+            | std::views::filter([&](Component* component) {
+                return component->terminal1() == point or component->terminal2() == point;
             })
             | std::ranges::to<std::vector<Component*>>();
+        }
+
+        [[nodiscard]] std::vector<Component*> components_at_point_no_wires(Point root) const {
+
+            std::vector<Component*> result;
+            std::queue<Point> frontier;
+            std::unordered_set<Point> visited;
+
+            frontier.push(root);
+            visited.insert(root);
+
+            while (not frontier.empty()) {
+                auto node = frontier.front();
+                frontier.pop();
+
+                auto children = components_at_point(node);
+
+                for (auto& child : children) {
+
+                    bool is_wire = dynamic_cast<Wire*>(child) != nullptr;
+                    if (is_wire) {
+                        auto point = child->opposite_terminal(node);
+                        if (visited.contains(point)) continue;
+                        frontier.push(point);
+                        visited.insert(point);
+
+                    } else {
+                        result.push_back(child);
+                    }
+
+                }
+
+            }
+
+            return result;
         }
 
         void traverse_circuit(Point root) const {
@@ -202,26 +237,25 @@ class Simulator {
                 auto node = frontier.front();
                 frontier.pop();
 
-                auto children = components_at_point(node);
-                for (auto& child : children) {
+                auto children = components_at_point_no_wires(node);
 
+                for (auto& child : children) {
+                    // BUG: cannot use node as the predecessor node, we have to keep track of the parent in components_at_point_no_wires()
                     auto point = child->opposite_terminal(node);
 
                     if (visited.contains(point)) continue;
                     frontier.push(point);
                     visited.insert(point);
-
-                    std::println("{}", child->label());
+                    std::print("{} ", child->label());
                 }
+                std::println();
 
             }
 
         }
 
         void simulate() const {
-
-            traverse_circuit(Point(8, 4));
-
+            traverse_circuit(Point(10, 10));
         }
 
         void draw_crosshair() const {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdexcept>
+#include <vector>
 #include <string>
 #include <string_view>
 
@@ -34,7 +35,6 @@ class Component {
             else
                 throw std::invalid_argument("cannot find opposite terminal, as the given terminal does not exist on this component");
         }
-
 
     protected:
         static inline const Color m_color = WHITE;

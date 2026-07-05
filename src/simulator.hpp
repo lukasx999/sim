@@ -182,22 +182,31 @@ class Simulator {
         }
 
         [[nodiscard]] std::vector<Component*> components_at_point(Point point) const {
+            auto is_connected = [&](Component* component) {
+                return component->terminal1() == point or component->terminal2() == point;
+            };
+
             return m_components
             | std::views::transform(&std::unique_ptr<Component>::get)
-            | std::views::filter([&](Component* component) {
-                return component->terminal1() == point or component->terminal2() == point;
-            })
+            | std::views::filter(is_connected)
             | std::ranges::to<std::vector<Component*>>();
         }
 
-        [[nodiscard]] std::vector<Component*> components_at_point_no_wires(Point root) const {
+        /// @return a list of components at the given point, paired with their respective path from the root point to
+        /// the root point of the actual component. this is necessary, because since this function ignores wires, the
+        /// given root parameter might not be the root of the returned component. the intermediate path is required so that
+        /// in traversal all of the intermediate points may be marked as visited.
+        [[nodiscard]] std::vector<std::pair<Component*, std::vector<Point>>> components_at_point_no_wires(Point root) const {
 
-            std::vector<Component*> result;
+            std::vector<std::pair<Component*, std::vector<Point>>> result;
             std::queue<Point> frontier;
             std::unordered_set<Point> visited;
 
             frontier.push(root);
             visited.insert(root);
+
+            // TODO: doesnt this conflict with other components?
+            std::vector<Point> intermediate_path;
 
             while (not frontier.empty()) {
                 auto node = frontier.front();
@@ -211,11 +220,15 @@ class Simulator {
                     if (is_wire) {
                         auto point = child->opposite_terminal(node);
                         if (visited.contains(point)) continue;
+
                         frontier.push(point);
                         visited.insert(point);
+                        intermediate_path.push_back(point);
 
                     } else {
-                        result.push_back(child);
+                        intermediate_path.push_back(node);
+                        result.push_back({child, intermediate_path});
+                        intermediate_path.clear();
                     }
 
                 }
@@ -239,14 +252,18 @@ class Simulator {
 
                 auto children = components_at_point_no_wires(node);
 
-                for (auto& child : children) {
-                    // BUG: cannot use node as the predecessor node, we have to keep track of the parent in components_at_point_no_wires()
-                    auto point = child->opposite_terminal(node);
+                for (auto& [child, child_path] : children) {
+                    auto point = child->opposite_terminal(child_path.back());
 
                     if (visited.contains(point)) continue;
                     frontier.push(point);
                     visited.insert(point);
-                    std::print("{} ", child->label());
+
+                    for (auto& p : child_path | std::views::take(child_path.size() - 1)) {
+                        visited.insert(p);
+                    }
+
+                    std::print("{}, ", child->label());
                 }
                 std::println();
 
@@ -255,7 +272,9 @@ class Simulator {
         }
 
         void simulate() const {
-            traverse_circuit(Point(10, 10));
+            Point root(10, 10);
+
+            traverse_circuit(root);
         }
 
         void draw_crosshair() const {

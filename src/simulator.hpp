@@ -1,5 +1,7 @@
 #pragma once
 
+#include <algorithm>
+#include <numeric>
 #include <print>
 #include <unordered_set>
 #include <queue>
@@ -243,6 +245,8 @@ class Simulator {
             frontier.push(root);
             visited.insert(root);
 
+            Resistance resistance = 0.0;
+
             while (not frontier.empty()) {
                 auto node = frontier.front();
                 frontier.pop();
@@ -251,6 +255,30 @@ class Simulator {
                 for (auto& p : intermediate_path) {
                     visited.insert(p);
                 }
+
+                #if 1
+                auto conductances = children
+                    | std::views::filter([&](const auto& pair) {
+                        auto& [child, child_root] = pair;
+                        auto point = child->opposite_terminal(child_root);
+                        return not visited.contains(point);
+                    })
+                    | std::views::transform([](const auto& pair) {
+                        auto& [child, child_root] = pair;
+                        return child;
+                    })
+                    | std::views::filter([](Component* child) {
+                        return dynamic_cast<Resistor*>(child) != nullptr;
+                    })
+                    | std::views::transform([](Component* child) {
+                        auto resistor = dynamic_cast<Resistor*>(child);
+                        assert(resistor != nullptr);
+                        return 1.0 / resistor->resistance();
+                    });
+
+                if (not conductances.empty())
+                    resistance += 1.0 / std::ranges::fold_left(conductances, 0.0, std::plus<Resistance>());
+                #endif
 
                 for (auto& [child, child_root] : children) {
                     assert(dynamic_cast<Wire*>(child) == nullptr);
@@ -265,6 +293,8 @@ class Simulator {
                 std::println();
 
             }
+
+            std::println("Rtotal: {}", resistance);
 
         }
 

@@ -12,6 +12,8 @@
 // TODO: move somewhere else
 inline const int NODE_RADIUS = 5;
 
+using Resistance = double;
+
 class Component {
     public:
         Component() = default;
@@ -127,7 +129,7 @@ class Resistor : public Component {
         , m_label(std::move(label))
         { }
 
-        [[nodiscard]] uint32_t resistance() const {
+        [[nodiscard]] Resistance resistance() const {
             return m_resistance;
         }
 
@@ -168,7 +170,7 @@ class Resistor : public Component {
 
     private:
         Point m_position;
-        uint32_t m_resistance = 10'000;
+        Resistance m_resistance = 10;
         const std::string m_label;
 
         static const int m_terminal_distance = 2; // distance from center

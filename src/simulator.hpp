@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <functional>
 #include <numeric>
 #include <print>
 #include <unordered_set>
@@ -237,6 +238,29 @@ class Simulator {
             return {components, visited_nodes};
         }
 
+        // TODO: code for calculating total circuit resistance:
+        // auto conductances = children
+        //     | std::views::filter([&](const auto& pair) {
+        //         auto& [child, child_root] = pair;
+        //         auto point = child->opposite_terminal(child_root);
+        //         return not visited.contains(point);
+        //     })
+        //     | std::views::transform([](const auto& pair) {
+        //         auto& [child, child_root] = pair;
+        //         return child;
+        //     })
+        //     | std::views::filter([](Component* child) {
+        //         return dynamic_cast<Resistor*>(child) != nullptr;
+        //     })
+        //     | std::views::transform([](Component* child) {
+        //         auto resistor = dynamic_cast<Resistor*>(child);
+        //         assert(resistor != nullptr);
+        //         return 1.0 / resistor->resistance();
+        //     });
+        //
+        // if (not conductances.empty())
+        //     resistance += 1.0 / std::ranges::fold_left(conductances, 0.0, std::plus<Resistance>());
+
         void traverse_circuit(Point root) const {
 
             std::queue<Point> frontier;
@@ -244,8 +268,6 @@ class Simulator {
 
             frontier.push(root);
             visited.insert(root);
-
-            Resistance resistance = 0.0;
 
             while (not frontier.empty()) {
                 auto node = frontier.front();
@@ -255,30 +277,6 @@ class Simulator {
                 for (auto& p : intermediate_path) {
                     visited.insert(p);
                 }
-
-                #if 1
-                auto conductances = children
-                    | std::views::filter([&](const auto& pair) {
-                        auto& [child, child_root] = pair;
-                        auto point = child->opposite_terminal(child_root);
-                        return not visited.contains(point);
-                    })
-                    | std::views::transform([](const auto& pair) {
-                        auto& [child, child_root] = pair;
-                        return child;
-                    })
-                    | std::views::filter([](Component* child) {
-                        return dynamic_cast<Resistor*>(child) != nullptr;
-                    })
-                    | std::views::transform([](Component* child) {
-                        auto resistor = dynamic_cast<Resistor*>(child);
-                        assert(resistor != nullptr);
-                        return 1.0 / resistor->resistance();
-                    });
-
-                if (not conductances.empty())
-                    resistance += 1.0 / std::ranges::fold_left(conductances, 0.0, std::plus<Resistance>());
-                #endif
 
                 for (auto& [child, child_root] : children) {
                     assert(dynamic_cast<Wire*>(child) == nullptr);
@@ -294,14 +292,72 @@ class Simulator {
 
             }
 
-            std::println("Rtotal: {}", resistance);
+        }
+
+        /// @brief calls the given function for all parallel children of the given root. the function should
+        /// return a list of booleans indicating whether to keep traversing the circuit from the given
+        /// child node.
+        using TraverseFn = std::vector<bool>(std::span<const Component*> children);
+        void traverse_circuit_lambda(Point root, std::function<TraverseFn> fn) const {
+
+            std::queue<Point> frontier;
+            std::unordered_set<Point> visited;
+
+            frontier.push(root);
+            visited.insert(root);
+
+            while (not frontier.empty()) {
+                auto node = frontier.front();
+                frontier.pop();
+
+                auto [children, intermediate_path] = components_at_point_no_wires(node);
+                for (auto& p : intermediate_path) {
+                    visited.insert(p);
+                }
+
+                auto remove_visited_children = [&](const auto& pair) {
+                    auto& [child, child_root] = pair;
+                    assert(dynamic_cast<Wire*>(child) == nullptr);
+                    auto point = child->opposite_terminal(child_root);
+                    return not visited.contains(point);
+                };
+
+                auto unvisited_children = children
+                    | std::views::filter(remove_visited_children)
+                    | std::views::transform(&std::pair<Component*, Point>::first)
+                    | std::ranges::to<std::vector<const Component*>>();
+
+                auto should_visit_list = fn(unvisited_children);
+                for (auto&& [should_visit, pair] : std::views::zip(should_visit_list, children)) {
+                    if (not should_visit) continue;
+
+                    auto& [child, child_root] = pair;
+                    auto point = child->opposite_terminal(child_root);
+                    frontier.push(point);
+                    visited.insert(point);
+                }
+
+            }
 
         }
 
         void simulate() const {
             Point root(10, 10);
 
-            traverse_circuit(root);
+            // traverse_circuit(root);
+
+            traverse_circuit_lambda(root, [&](std::span<const Component*> children) -> std::vector<bool> {
+                for (auto& child : children) {
+                    std::print("{}, ", child->label());
+                }
+                std::println();
+
+                return children
+                | std::views::transform([](auto&) {
+                    return true;
+                })
+                | std::ranges::to<std::vector<bool>>();
+            });
         }
 
         void draw_crosshair() const {

@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <functional>
-#include <numeric>
 #include <print>
 #include <unordered_set>
 #include <queue>
@@ -294,10 +293,8 @@ class Simulator {
 
         }
 
-        /// @brief calls the given function for all parallel children of the given root. the function should
-        /// return a list of booleans indicating whether to keep traversing the circuit from the given
-        /// child node.
-        using TraverseFn = std::vector<bool>(std::span<const Component*> children);
+        /// @brief calls the given function for all parallel children of the given root.
+        using TraverseFn = void(std::span<const Component*> children);
         void traverse_circuit_lambda(Point root, std::function<TraverseFn> fn) const {
 
             std::queue<Point> frontier;
@@ -327,12 +324,13 @@ class Simulator {
                     | std::views::transform(&std::pair<Component*, Point>::first)
                     | std::ranges::to<std::vector<const Component*>>();
 
-                auto should_visit_list = fn(unvisited_children);
-                for (auto&& [should_visit, pair] : std::views::zip(should_visit_list, children)) {
-                    if (not should_visit) continue;
+                if (not unvisited_children.empty())
+                    fn(unvisited_children);
 
-                    auto& [child, child_root] = pair;
+                for (auto& [child, child_root] : children) {
+                    assert(dynamic_cast<Wire*>(child) == nullptr);
                     auto point = child->opposite_terminal(child_root);
+                    if (visited.contains(point)) continue;
                     frontier.push(point);
                     visited.insert(point);
                 }
@@ -346,17 +344,11 @@ class Simulator {
 
             // traverse_circuit(root);
 
-            traverse_circuit_lambda(root, [&](std::span<const Component*> children) -> std::vector<bool> {
+            traverse_circuit_lambda(root, [&](std::span<const Component*> children) {
                 for (auto& child : children) {
                     std::print("{}, ", child->label());
                 }
                 std::println();
-
-                return children
-                | std::views::transform([](auto&) {
-                    return true;
-                })
-                | std::ranges::to<std::vector<bool>>();
             });
         }
 

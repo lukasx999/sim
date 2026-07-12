@@ -1,7 +1,7 @@
 #pragma once
 
 #include <cmath>
-#include <unordered_map>
+#include <format>
 #include <cstdint>
 
 #include <raylib.h>
@@ -33,7 +33,7 @@ struct Point {
         };
     }
 
-    bool operator<=>(const Point& other) const = default;
+    auto operator<=>(const Point& other) const = default;
 
     Point operator*(uint32_t value) const {
         return { x * value, y * value };
@@ -55,9 +55,15 @@ struct Point {
 
 template <>
 struct std::hash<Point> {
-
     size_t operator()(const Point& point) const {
         return std::hash<uint32_t>()(point.x) + std::hash<uint32_t>()(point.y);
     }
+};
 
+template <>
+struct std::formatter<Point> : std::formatter<std::string> {
+    auto format(const Point& point, std::format_context& ctx) const {
+        auto fmt = std::format("({}, {})", point.x, point.y);
+        return std::formatter<std::string>::format(fmt, ctx);
+    }
 };

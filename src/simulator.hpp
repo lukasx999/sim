@@ -232,63 +232,6 @@ class Simulator {
             return components;
         }
 
-        [[nodiscard]] std::vector<Point> end_of_junction_explore_path(Point root, std::unordered_set<Point>& visited) const {
-
-            std::vector<Point> path;
-            std::queue<Point> frontier;
-
-            frontier.push(root);
-            visited.insert(root);
-
-            while (not frontier.empty()) {
-                auto node = frontier.front();
-                frontier.pop();
-
-                path.push_back(node);
-                std::println("{}", node);
-
-                auto children = components_at_point_no_wires(node, visited);
-
-                for (auto& [child, child_root] : children) {
-                    auto successor = child->opposite_terminal(child_root);
-                    if (visited.contains(successor)) continue;
-
-                    frontier.push(successor);
-                    visited.insert(successor);
-                }
-
-            }
-
-            return path;
-        }
-
-        [[nodiscard]] Point end_of_junction(Point root, std::unordered_set<Point>& visited) const {
-            auto children = components_at_point_no_wires(root, visited);
-
-            auto paths = children
-                | std::views::transform(&std::pair<Component*, Point>::second)
-                | std::views::filter([&](Point child_root) {
-                    return not visited.contains(child_root);
-                })
-                | std::views::transform([&](Point child_root) {
-                    return end_of_junction_explore_path(child_root, visited);
-                })
-                | std::ranges::to<std::vector<std::vector<Point>>>();
-
-            auto intersections = std::ranges::fold_left(paths, std::vector<Point>{}, [&](std::vector<Point> acc, const std::vector<Point>& path) {
-                std::vector<Point> out;
-                std::ranges::set_intersection(acc, path, std::back_inserter(out));
-                return out;
-            });
-
-            for (auto& p : intersections) {
-                std::println("{}", p);
-            }
-
-            return {};
-            // return intersections.front();
-        }
-
         /// @brief computes the resistance of the subcircuit between the given points
         [[nodiscard]] Resistance traverse_subcircuit(Point root, std::optional<Point> end,
             std::unordered_set<Point>& visited, const std::vector<Point>& to_ignore) const {
@@ -328,7 +271,7 @@ class Simulator {
                 } else {
                     for (auto& [child, child_root] : children) {
 
-                        auto ignore_set = unvisited_children
+                        auto to_ignore_list = unvisited_children
                             | std::views::transform(&std::pair<Component*, Point>::second)
                             | std::views::filter([&](Point point) {
                                 return point != child_root;
@@ -336,7 +279,7 @@ class Simulator {
                             | std::ranges::to<std::vector<Point>>();
 
                         auto junction_end = end_of_junction(root, visited);
-                        auto res = traverse_subcircuit(child_root, junction_end, visited, ignore_set);
+                        auto res = traverse_subcircuit(child_root, junction_end, visited, to_ignore_list);
 
                         g_total += 1 / res;
                         node = junction_end;
@@ -350,11 +293,116 @@ class Simulator {
             return r_total;
         }
 
+        [[nodiscard]] bool subcircuit_contains(Point start, Point query, const std::unordered_set<Point>& visited) const {
+
+            std::queue<Point> frontier;
+            std::unordered_set<Point> local_visited;
+
+            frontier.push(start);
+            local_visited.insert(start);
+
+            while (not frontier.empty()) {
+                auto node = frontier.front();
+                frontier.pop();
+
+                if (node == query)
+                    return true;
+
+                auto children = components_at_point(node);
+
+                for (auto& child : children) {
+                    auto successor = child->opposite_terminal(node);
+                    if (local_visited.contains(successor)) continue;
+                    if (visited.contains(successor)) continue;
+
+                    frontier.push(successor);
+                    local_visited.insert(successor);
+                }
+
+            }
+
+            return false;
+        }
+
+        /// @param root root of the junction
+        /// @param start child of the root to explore
+        [[nodiscard]] std::vector<Point> end_of_junction_explore_path(Point start, Point root) const {
+
+            std::vector<Point> path;
+            std::queue<Point> frontier;
+            std::unordered_set<Point> visited;
+
+            frontier.push(start);
+            visited.insert(start);
+
+            while (not frontier.empty()) {
+                auto node = frontier.front();
+                frontier.pop();
+                path.push_back(node);
+
+                auto children = components_at_point(node);
+                auto unvisited_children = children
+                    | std::views::filter([&](Component* child) {
+                        auto successor = child->opposite_terminal(node);
+                        return visited.contains(successor);
+                    })
+                    | std::ranges::to<std::vector<Component*>>();
+
+                for (auto& child : children) {
+                    auto successor = child->opposite_terminal(node);
+
+                    if (unvisited_children.size() > 1 and subcircuit_contains(successor, root, visited))
+                        continue;
+
+                    visited.insert(successor);
+                    frontier.push(successor);
+                }
+
+            }
+
+            return path;
+        }
+
+        /// @brief computes the end point of a junction. this is needed so we know when to stop traversing
+        /// a parallel subcircuit.
+        [[nodiscard]] Point end_of_junction(Point root, const std::unordered_set<Point>& visited) const {
+            auto children = components_at_point(root);
+
+            auto paths = children
+                | std::views::filter([&](Component* child) {
+                    auto successor = child->opposite_terminal(root);
+                    return not visited.contains(successor);
+                })
+                | std::views::transform([&](Component* child) {
+                    auto successor = child->opposite_terminal(root);
+                    return end_of_junction_explore_path(successor, root);
+                })
+                | std::ranges::to<std::vector<std::vector<Point>>>();
+
+            for (auto& path : paths) {
+                std::print("path: ");
+                for (auto& p : path) {
+                    std::print("{} ", p);
+                }
+                std::println();
+            }
+
+            // TODO: get intersection
+
+            return {};
+        }
+
         void simulate() const {
             Point root(10, 10);
 
             std::unordered_set<Point> visited;
-            end_of_junction_explore_path(root, visited);
+            auto children = components_at_point(root);
+            std::println("exploring: {}", children.front()->opposite_terminal(root));
+            auto path = end_of_junction_explore_path(children.front()->opposite_terminal(root), root);
+            for (auto& p : path) {
+                std::print("{} ", p);
+            }
+            std::println();
             // auto end = end_of_junction(root, visited);
             // std::println("end: {} {}", end.x, end.y);
 

@@ -298,14 +298,10 @@ class Simulator {
         /// @returns std::nullopt if there is no junction
         [[nodiscard]] std::optional<Point> end_of_junction(Point root) const {
 
-            std::vector<std::queue<Point>> frontiers;
-            std::vector<std::unordered_set<Point>> visited_sets;
-
             auto initial_components = components_at_point(root);
-            for (auto& c : initial_components) {
-                visited_sets.push_back({});
-                frontiers.push_back({});
-            }
+
+            std::vector<std::queue<Point>> frontiers(initial_components.size());
+            std::vector<std::unordered_set<Point>> visited_sets(initial_components.size());
 
             assert(frontiers.size() == initial_components.size());
             assert(visited_sets.size() == initial_components.size());
@@ -351,7 +347,7 @@ class Simulator {
                 }
             }
 
-            return {};
+            return std::nullopt;
         }
 
         void simulate() const {
